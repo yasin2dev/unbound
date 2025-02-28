@@ -1,5 +1,5 @@
 <p align="center">
-  <h2 align="center">Web Based Chat App Project</h2>
+  <h2 align="center">Unbound - Realtime Chat App</h2>
 </p>
 
 <div align="center">
@@ -8,41 +8,48 @@
     <img src="./res/badges/knex.svg"/>
 </div>
 
-Basic web based chat application, Built with Websocket, PostgreSQL, React.js and Knex.js
+Unbound - Realtime chat application. Built with Websocket, PostgreSQL, React.js and Knex.js
 
-<ins>Important note:</ins> This project not for professional use. It's for the improve myself.
 
 ## Installation
 
-- <p>Install project source code via: <code>git clone https://github.com/yasin2dev/websocket-chat-app.git</code></p>
+- <p>Install project source code via: <code>git clone https://github.com/yasin2dev/unbound.git</code></p>
 
 - <p>Open the command line within the downloaded folder, navigate to the server and client directories, and run the command <code>npm i</code>:</p>
 ```cmd
-    C:\websocket-chat-app> cd server
-    C:\websocket-chat-app\server> npm i
+    C:\unbound> cd server
+    C:\unbound\server> npm i
 ```
 ```cmd
-    C:\websocket-chat-app> cd client
-    C:\websocket-chat-app\client> npm i
+    C:\unbound> cd client
+    C:\unbound\client> npm i
 ```
-- To complete the database configuration, you can edit the <code>[.env](https://github.com/yasin2dev/websocket-chat-app/blob/master/.env)</code> file.
+- To complete the database configuration, you need to create and edit the <code>.env</code> file.
+
+#### Database
+
+For tables, you must install knex via ```npm i -g knex``` or run with ```npx knex```.
+
+Run the command ``` knex migrate:latest ```
+
+You are ready to go!
 
 ## Run Project
 - For running the server:
 ```cmd
-    C:\websocket-chat-app> cd server
-    C:\websocket-chat-app\server> npm run start
+    C:\unbound> cd server
+    C:\unbound\server> npm run start
 ```
 - For running front-end:
 ```cmd
-    C:\websocket-chat-app> cd client
-    C:\websocket-chat-app\client> npm run dev
+    C:\unbound> cd client
+    C:\unbound\client> npm run dev
 ```
 
-## Default Settings
+## Future Plans
 
-### Ports:
+With version 0.0.1b, there is no auth system actually. It is not a release version. It is a (W)ork (I)n (P)rogress version.
 
-- Database: 5432
-- Front-end: 5173
-- Websocket Server: 3001
+- Auth System (High Priority)
+- SideBar for channels
+- Voice communication (webRTC)
