@@ -182,7 +182,7 @@ export default function Home({ username }) {
             <a target="_blank" className="cursor-pointer underline" title="Will be added soon">changelog</a>
           </p>
           <p className="text-sm">Yasin Bozkurt © 2025</p>
-          <a href="https://github.com/yasin2dev/websocket-chat-app" target="_blank" className="mt-2">
+          <a href="https://github.com/yasin2dev/unbound" target="_blank" className="mt-2">
             <span className="material-symbols-outlined text-purple-500" title="Go To Source Code on Github">code</span>
           </a>
         </div>
