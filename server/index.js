@@ -4,15 +4,14 @@ const url = require("url");
 const uuidv4 = require("uuid").v4;
 const db = require("./database/knex");
 const path = require('path');
-require("dotenv").config({path: path.resolve(__dirname, '../.env')});
+require("dotenv").config({ path: path.resolve(__dirname, '../.env') });
 
 const server = http.createServer();
 const socketServer = new WebSocketServer({ server });
 const port = process.env.WS_PORT;
 
 const selectAllData = (table) => {
-    return db.select("*")
-        .from(table)
+    return db.withSchema('unbound').table(table).select('*')
         .then((data) => {
             return data
         }).catch((error) => {
@@ -24,7 +23,7 @@ const selectAllData = (table) => {
 // WARN: For these operations to work properly, the command 'knex migrate:latest' must be executed.
 /* This function inserting message data to the 'chats' table, PostgreSQL database. */
 const insertChatData = (user, msg, time, uuid) => {
-    return db('chats').insert({
+    return db.withSchema('unbound').table('chats').insert({
         author: user,
         msg: msg,
         time: time,
@@ -55,11 +54,11 @@ const users = {};
 var bUser = [];
 const watcher = new Set();
 
-const handleMessage = (bytes, uuid) => {    
+const handleMessage = (bytes, uuid) => {
     const parsedMessage = JSON.parse(bytes)
     if (parsedMessage.type === 'chat-message') {
         const message = parsedMessage.msg;
-        const user = users[uuid];   
+        const user = users[uuid];
         if (!user) {
             console.error(`User not found for UUID: ${uuid}`);
             return;
@@ -97,12 +96,12 @@ socketServer.on("connection", (connection, request) => {
     const { username } = url.parse(request.url, true).query;
     const path = url.parse(request.url, true).pathname;
     const validSocketUrl = "/";
-    
+
     if (path === validSocketUrl) {
         const csrfToken = uuidv4();
 
         let isDuplicate = false;
-        Object.values(users).forEach((item) => {       
+        Object.values(users).forEach((item) => {
             if (item.username.toLowerCase() === username.toLowerCase()) {
                 isDuplicate = true;
                 watcher.add(item)
@@ -110,15 +109,15 @@ socketServer.on("connection", (connection, request) => {
                 watcher.delete(item)
             }
         });
-        
-        
+
+
         let last = null;
         connection.once("message", (msg) => {
             const parsedMessage = JSON.parse(msg.toString())
             if (parsedMessage.type === 'authToken') {
                 last = csrfToken;
             }
-    
+
             if (isDuplicate === false && csrfToken === last) {
                 const uuid = uuidv4()
                 if (username) {
@@ -131,19 +130,19 @@ socketServer.on("connection", (connection, request) => {
                 }
                 broadcastUsers();
                 selectAllData('chats')
-                .then((data) => {
-                    bUser = [...data];
-                    bUser.map((uuid) => {
-                        connection.send(JSON.stringify({ event: 'message-server', mesg: uuid.msg, author: uuid.author, time: uuid.time, disconnectedUser: '' }));
+                    .then((data) => {
+                        bUser = [...data];
+                        bUser.map((uuid) => {
+                            connection.send(JSON.stringify({ event: 'message-server', mesg: uuid.msg, author: uuid.author, time: uuid.time, disconnectedUser: '' }));
+                        })
                     })
-                })
-    
+
                 connection.on("message", (message) => handleMessage(message, uuid))
                 connection.on("close", () => handleClose(uuid))
-                connection.send(JSON.stringify({ event: 'duplicated', isDuplicated: isDuplicate }))            
+                connection.send(JSON.stringify({ event: 'duplicated', isDuplicated: isDuplicate }))
                 console.log(`User connected: ${username} - [${createTimeAndDate().toString()}]`)
                 connection.send(JSON.stringify({ event: 'auth', csrfToken: csrfToken }))
-        
+
             }
         })
     } else {
