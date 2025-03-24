@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Register from './components/Register';
 import Login from './components/Login';
-import Home from './components/Home';
+import { AuthProvider } from './middleware/AuthContext';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Dashboard from './components/Dashboard';
 
 function App() {
-  const [username, setUsername] = useState("");
-
-  return username ? (
-    <Home username={username} />
-  ) : (
-    <Login onSubmit={setUsername} />
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path='/register' element={<Register/>}/>
+          <Route path='/login' element={<Login/>}/>
+          <Route path='/dashboard' element={<Dashboard/>}/>
+        </Routes>
+      </Router>
+    </AuthProvider>
   )
-
 }
 
 

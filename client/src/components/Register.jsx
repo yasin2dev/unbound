@@ -4,14 +4,15 @@ import { useNavigate } from "react-router-dom"
 
 
 export default function Register() {
+    const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const { login } = useAuth();
+    const { register } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        login(email, password);
+        register(username, email, password);
         navigate('/dashboard');
     };
 
@@ -19,6 +20,12 @@ export default function Register() {
         <div className='align-items-center m-auto w-1/2 text-center'>
             <h1 className='text-2xl'>Welcome to  <code>Unbound</code></h1>
             <form onSubmit={handleSubmit} className='my-8'>
+                <input
+                    type="text"
+                    placeholder='Username'
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="focus:outline-none rounded-md p-2 mt-2 w-full" 
+                />
                 <input
                     type="text"
                     placeholder='Email Address'

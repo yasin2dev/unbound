@@ -1,37 +1,17 @@
 const http = require("http");
 const { WebSocketServer } = require("ws");
-const url = require("url");
-const uuidv4 = require("uuid").v4;
-const db = require("./database/knex");
+
 const path = require('path');
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+
+//  const db = require("./database/knex"); // database connection will be.
+
 require("dotenv").config({ path: path.resolve(__dirname, '../.env') });
 
 const server = http.createServer();
 const socketServer = new WebSocketServer({ server });
 const port = process.env.WS_PORT;
-
-const selectAllData = (table) => {
-    return db.withSchema('unbound').table(table).select('*')
-        .then((data) => {
-            return data
-        }).catch((error) => {
-            console.error('Error on getting data from the DB: ' + error)
-        })
-}
-
-
-// WARN: For these operations to work properly, the command 'knex migrate:latest' must be executed.
-/* This function inserting message data to the 'chats' table, PostgreSQL database. */
-const insertChatData = (user, msg, time, uuid) => {
-    return db.withSchema('unbound').table('chats').insert({
-        author: user,
-        msg: msg,
-        time: time,
-        userUuid: uuid
-    }).catch((error) => {
-        console.error('Error on inserting chat data to the DB: ' + error)
-    })
-}
 
 /* Create time and date for every block and return final timeAndDate format.*/
 /*** 
@@ -48,116 +28,50 @@ const createTimeAndDate = () => {
     return timeAndDate
 }
 
+const users = []; // TempUsers, PostgreSQL will be replace it.
 
-const connections = {}
-const users = {};
-var bUser = [];
-const watcher = new Set();
-
-const handleMessage = (bytes, uuid) => {
-    const parsedMessage = JSON.parse(bytes)
-    if (parsedMessage.type === 'chat-message') {
-        const message = parsedMessage.msg;
-        const user = users[uuid];
-        if (!user) {
-            console.error(`User not found for UUID: ${uuid}`);
-            return;
-        } else {
-            insertChatData(user.username, message, createTimeAndDate(), user.UUID)
-            broadcastMessages(user, bytes);
-        }
+const verifyToken = (token) => {
+    try {
+        return jwt.verify(token, process.env.JWT_TOKEN)
+    } catch (e) {
+        return null; // TODO   
     }
-};
-
-
-
-const broadcastMessages = (uInfo, bytes) => {
-    Object.values(connections).forEach((uuid) => {
-        const message = JSON.parse(bytes)
-        uuid.send(JSON.stringify({ event: "message-server", mesg: message.msg, author: uInfo.username, time: timeAndDate, disconnectedUser: '', }));
-    });
-};
-
-const broadcastDisconnections = (uInfo) => {
-    Object.values(connections).map((uuid) => {
-        uuid.send(JSON.stringify({ event: "message-server", mesg: '', author: 'SERVER', disconnectedUser: uInfo?.username }));
-        uuid.send(JSON.stringify({ event: "users", users: users }))
-    })
 }
-
-const broadcastUsers = () => {
-    Object.values(connections).map((uuid) => {
-        uuid.send(JSON.stringify({ event: "users", users: users }))
-    })
-}
-
 
 socketServer.on("connection", (connection, request) => {
-    const { username } = url.parse(request.url, true).query;
-    const path = url.parse(request.url, true).pathname;
-    const validSocketUrl = "/";
-
     if (path === validSocketUrl) {
-        const csrfToken = uuidv4();
+        connection.on("message", async (message) => {
+            const data = JSON.parse(message);
 
-        let isDuplicate = false;
-        Object.values(users).forEach((item) => {
-            if (item.username.toLowerCase() === username.toLowerCase()) {
-                isDuplicate = true;
-                watcher.add(item)
-                connection.send(JSON.stringify({ event: 'duplicated', isDuplicated: isDuplicate }))
-                watcher.delete(item)
+            if (data.type === "login") {
+                const user = users.find((u) => u.email === data.email);
+                if (!user || !(await bcrypt.compare(data.password, user.password))) {
+                    return connection.send(JSON.stringify({ type: 'error', message: 'Error! Not Valid Credentials' }));
+                }
+
+                const token = jwt.sign({ email: user.email, name: user.name }, process.env.JWT_TOKEN, { expiresIn: '1h' });
+                connection.send(JSON.stringify({ type: 'auth_success', token, user: { name: user.name, email: user.email } }));
+            }
+
+            if (data.type === "register") {
+                const hashedPassword = await bcrypt.hash(data.password, 10);
+                users.push({ name: data.name, email: data.email, password: hashedPassword });
+                connection.send(JSON.stringify({ type: 'register_success', message: 'Register success' }));
+                console.log(users);
+            }
+
+            if (data.type === "authenticate") {
+                const user = verifyToken(data.token);
+                if (!user) {
+                    return connection.send(JSON.stringify({ type: 'error', message: 'Invalid Token' }));
+                }
+                connection.send(JSON.stringify({ type: 'auth_success', user }));
             }
         });
-
-
-        let last = null;
-        connection.once("message", (msg) => {
-            const parsedMessage = JSON.parse(msg.toString())
-            if (parsedMessage.type === 'authToken') {
-                last = csrfToken;
-            }
-
-            if (isDuplicate === false && csrfToken === last) {
-                const uuid = uuidv4()
-                if (username) {
-                    connections[uuid] = connection;
-                    users[uuid] = {
-                        UUID: uuid,
-                        username: username,
-                        status: "online",
-                    };
-                }
-                broadcastUsers();
-                selectAllData('chats')
-                    .then((data) => {
-                        bUser = [...data];
-                        bUser.map((uuid) => {
-                            connection.send(JSON.stringify({ event: 'message-server', mesg: uuid.msg, author: uuid.author, time: uuid.time, disconnectedUser: '' }));
-                        })
-                    })
-
-                connection.on("message", (message) => handleMessage(message, uuid))
-                connection.on("close", () => handleClose(uuid))
-                connection.send(JSON.stringify({ event: 'duplicated', isDuplicated: isDuplicate }))
-                console.log(`User connected: ${username} - [${createTimeAndDate().toString()}]`)
-                connection.send(JSON.stringify({ event: 'auth', csrfToken: csrfToken }))
-
-            }
-        })
     } else {
         socketServer.close(1011, "Invalid socket URL");
     }
 })
-
-
-const handleClose = (uuid) => {
-    const disconnectedUser = users[uuid];
-    delete connections[uuid];
-    delete users[uuid];
-    broadcastDisconnections(disconnectedUser)
-    console.log(`User disconnected: ${disconnectedUser.username} - [${createTimeAndDate().toString()}] `)
-}
 
 server.listen(port, () => {
     console.log(`Websocket server started successfully on port: ${port}`);
