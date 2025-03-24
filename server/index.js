@@ -38,8 +38,7 @@ const verifyToken = (token) => {
     }
 }
 
-socketServer.on("connection", (connection, request) => {
-    if (path === validSocketUrl) {
+socketServer.on("connection", (connection) => {
         connection.on("message", async (message) => {
             const data = JSON.parse(message);
 
@@ -68,9 +67,6 @@ socketServer.on("connection", (connection, request) => {
                 connection.send(JSON.stringify({ type: 'auth_success', user }));
             }
         });
-    } else {
-        socketServer.close(1011, "Invalid socket URL");
-    }
 })
 
 server.listen(port, () => {
