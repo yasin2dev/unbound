@@ -1,15 +1,19 @@
-const http = require("http");
+const https = require("https");
+const fs = require('fs');
+
 const { WebSocketServer } = require("ws");
 
 const path = require('path');
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-
 //  const db = require("./database/knex"); // database connection will be.
 
 require("dotenv").config({ path: path.resolve(__dirname, '../.env') });
 
-const server = http.createServer();
+const server = https.createServer({
+    key: fs.readFileSync('../cert/key.pem'),
+    cert: fs.readFileSync('../cert/cert.pem'),
+});
 const socketServer = new WebSocketServer({ server });
 const port = process.env.WS_PORT;
 
@@ -39,34 +43,36 @@ const verifyToken = (token) => {
 }
 
 socketServer.on("connection", (connection) => {
-        connection.on("message", async (message) => {
-            const data = JSON.parse(message);
-
-            if (data.type === "login") {
-                const user = users.find((u) => u.email === data.email);
-                if (!user || !(await bcrypt.compare(data.password, user.password))) {
-                    return connection.send(JSON.stringify({ type: 'error', message: 'Error! Not Valid Credentials' }));
-                }
-
-                const token = jwt.sign({ email: user.email, name: user.name }, process.env.JWT_TOKEN, { expiresIn: '1h' });
-                connection.send(JSON.stringify({ type: 'auth_success', token, user: { name: user.name, email: user.email } }));
+    connection.on('open', () => {
+        console.log("istek var")
+    })
+    connection.on("message", async (message) => {
+        const data = JSON.parse(message);
+        if (data.type === "login") {
+            const user = users.find((u) => u.email === data.email);
+            if (!user || !(await bcrypt.compare(data.password, user.password))) {
+                return connection.send(JSON.stringify({ type: 'error', message: 'Error! Not Valid Credentials' }));
             }
 
-            if (data.type === "register") {
-                const hashedPassword = await bcrypt.hash(data.password, 10);
-                users.push({ name: data.name, email: data.email, password: hashedPassword });
-                connection.send(JSON.stringify({ type: 'register_success', message: 'Register success' }));
-                console.log(users);
-            }
+            const token = jwt.sign({ email: user.email, name: user.name }, process.env.JWT_TOKEN, { expiresIn: '1h' });
+            connection.send(JSON.stringify({ type: 'auth_success', token, user: { name: user.name, email: user.email } }));
+        }
 
-            if (data.type === "authenticate") {
-                const user = verifyToken(data.token);
-                if (!user) {
-                    return connection.send(JSON.stringify({ type: 'error', message: 'Invalid Token' }));
-                }
-                connection.send(JSON.stringify({ type: 'auth_success', user }));
+        if (data.type === "register") {
+            const hashedPassword = await bcrypt.hash(data.password, 10);
+            users.push({ name: data.name, email: data.email, password: hashedPassword });
+            connection.send(JSON.stringify({ type: 'register_success', message: 'Register success' }));
+            console.log(users);
+        }
+
+        if (data.type === "authenticate") {
+            const user = verifyToken(data.token);
+            if (!user) {
+                return connection.send(JSON.stringify({ type: 'error', message: 'Invalid Token' }));
             }
-        });
+            connection.send(JSON.stringify({ type: 'auth_success', user }));
+        }
+    });
 })
 
 server.listen(port, () => {

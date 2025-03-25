@@ -25,3 +25,6 @@ dist-ssr
 
 # dotenv files
 .env
+
+# localhost cert
+/cert
